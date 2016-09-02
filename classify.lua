@@ -1,27 +1,43 @@
-require 'torch'
-require 'cutorch'
-require 'image'
-require 'sys'
-torch.setdefaulttensortype('torch.FloatTensor')
-cuBatch = torch.CudaTensor()
-
 function classify(img, batch, box, cls)
     print('Lua classify function')
-    --[[
-    print(#img)
-    print(#batch)
-    print(#box)
-    print(#cls)
-    --]]
+
     sys.tic()
     
     local im = img:permute(3, 1, 2)
     for i = 1, batch:size(1) do
         batch[i] = image.scale(im, 48, 48)
     end
-    cuBatch = batch:cuda()
-    --image.save('./test.jpg', batch[1])
+    
+    -- Normalize
+    batch:add(-mean)
+    batch:div(std)
+    batch = norm:forward(batch)
+    
+    -- Forward
+    cuBatch:copy(batch)
+    local scores = model:forward(cuBatch)
+    local _, preds = scores:max(2)
+    cls = preds:float()
     
     print('Time: '..(sys.toc()*1000)..'ms')
+    
     return cls
 end
+
+--classify(torch.Tensor(256,256,3),torch.Tensor(20,3,48,48),torch.Tensor(20,4),torch.Tensor(20))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
