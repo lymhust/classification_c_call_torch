@@ -1,30 +1,41 @@
-function classify(img, batch, box, cls)
+function classify(img, box, cls)
     print('Lua classify function')
 
     sys.tic()
+    cuBatch:zero()
     
     local im = img:permute(3, 1, 2)
-    for i = 1, batch:size(1) do
-        batch[i] = image.scale(im, 48, 48)
+    local ind = 0
+    
+    for i = 1, boxNum do
+        if(box[i][1] ~= -1) then
+            local left,top,w,h = box[i][1],box[i][2],box[i][3],box[i][4]
+            local right = left+w-1
+            local bottom = top+h-1
+            cuBatch[i] = image.scale(im[{ {},{top,bottom},{left,right} }], 48, 48)    
+            ind = ind + 1
+        else
+            break
+        end
     end
     
-    -- Normalize
-    batch:add(-mean)
-    batch:div(std)
-    batch = norm:forward(batch)
+    if(ind > 0 and ind <= boxNum) then
+        -- Normalize
+        cuBatch:add(-mean)
+        cuBatch:div(std)
     
-    -- Forward
-    cuBatch:copy(batch)
-    local scores = model:forward(cuBatch)
-    local _, preds = scores:max(2)
-    cls = preds:float()
-    
+        -- Forward
+        local scores = model:forward(cuBatch[{ {1,ind},{},{},{} }])
+        local _, preds = scores:max(2)
+
+        -- Get the result
+        cls:copy(preds:int()) -- Copy data and the pointer is not changed
+    end
     print('Time: '..(sys.toc()*1000)..'ms')
     
-    return cls
 end
 
---classify(torch.Tensor(256,256,3),torch.Tensor(20,3,48,48),torch.Tensor(20,4),torch.Tensor(20))
+--classify(torch.Tensor(256,256,3),torch.IntTensor(20,4),torch.IntTensor(20))
 
 
 
